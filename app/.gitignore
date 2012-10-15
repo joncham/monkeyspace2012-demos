@@ -1,3 +1,4 @@
 app.app/*
 Makefile
 *.o
+/Add.dll

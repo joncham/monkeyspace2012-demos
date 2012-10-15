@@ -6,6 +6,20 @@ TEMPLATE = app
 TARGET = 
 DEPENDPATH += .
 INCLUDEPATH += .
+INCLUDEPATH += /Users/jonathan/Development/mono_mono/install_64/include/mono-2.0
+
+LIBS += -L/Users/jonathan/Development/mono_mono/install_64/lib -lmono-2.0
 
 # Input
 SOURCES += main.cpp
+CS_SOURCES += Add.cs
+
+c_sharp.output = ${QMAKE_FILE_IN_BASE}.dll
+c_sharp.input = CS_SOURCES
+c_sharp.commands = gmcs ${QMAKE_FILE_IN} $${IDLFLAGS} \
+                 -t:library -o:${QMAKE_FILE_IN_BASE}.dll
+c_sharp.name = GMCS
+c_sharp.variable_out = CS_OUTPUT
+ 
+QMAKE_EXTRA_COMPILERS += c_sharp
+PRE_TARGETDEPS += Add.dll

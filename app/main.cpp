@@ -6,6 +6,11 @@
 #include <QVBoxLayout>
 #include <QMouseEvent>
 
+#include <mono/jit/jit.h>
+#include <mono/metadata/assembly.h>
+
+static MonoMethod* s_Add;
+
 class Adder : public QPushButton
 {
   public:
@@ -27,7 +32,14 @@ class Adder : public QPushButton
 			QString addend2 = _lineEdit2->text();
 			double d1 = addend1.toDouble();
 			double d2 = addend2.toDouble();
-			QString sum = QString::number(d1+d2);
+
+			void* args[2];
+			args[0] = &d1;
+			args[1] = &d2;
+			MonoObject* boxedResult = mono_runtime_invoke(s_Add, NULL, args, NULL);
+			double d = *(double*)mono_object_unbox (boxedResult);
+
+			QString sum = QString::number(d);
 			_lineEdit3->setText(sum);
 
 		} 
@@ -40,8 +52,20 @@ private:
 	QLineEdit* _lineEdit3;
 };
 
+void init_mono()
+{
+	const char* file = "/Users/jonathan/Development/monkeyspace2012-demos/app/Add.dll";
+	MonoDomain* domain = mono_jit_init (file);
+	MonoAssembly *assembly = mono_domain_assembly_open (domain, file);
+	MonoImage* image = mono_assembly_get_image (assembly);
+
+	MonoClass* klass = mono_class_from_name (image, "EmbedSample", "Adder");
+	s_Add = mono_class_get_method_from_name (klass, "Add", 2);
+}
+
 int main(int argc, char *argv[])
 {
+    init_mono ();
     QApplication app(argc, argv);
 
     QWidget window;
