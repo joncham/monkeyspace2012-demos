@@ -2,3 +2,12 @@ app.app/*
 Makefile
 *.o
 /Add.dll
+/*.vcxproj*
+/*.sdf
+/*.opensdf
+/*.sln
+/*.suo
+/*.pdb
+/ipch
+/debug
+/release

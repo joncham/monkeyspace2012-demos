@@ -6,6 +6,9 @@
 #include <QVBoxLayout>
 #include <QMouseEvent>
 
+#include <QFileInfo>
+#include <QDir>
+
 #include <mono/jit/jit.h>
 #include <mono/metadata/assembly.h>
 
@@ -43,7 +46,7 @@ class Adder : public QPushButton
 			_lineEdit3->setText(sum);
 
 		} 
-		QPushButton::mouseReleaseEvent(event);  
+		QPushButton::mouseReleaseEvent(event);
 	} 
 
 private:
@@ -54,9 +57,15 @@ private:
 
 void init_mono()
 {
-	const char* file = "/Users/jonathan/Development/monkeyspace2012-demos/app/Add.dll";
-	MonoDomain* domain = mono_jit_init (file);
-	MonoAssembly *assembly = mono_domain_assembly_open (domain, file);
+	QString path = QFileInfo( QCoreApplication::applicationFilePath() ).absolutePath();
+#ifdef WIN32
+	path += "/../Add.dll";
+#else
+	std::string file("/Users/jonathan/Development/monkeyspace2012-demos/app/Add.dll");
+#endif
+	std::string file (path.toUtf8().constData());
+	MonoDomain* domain = mono_jit_init (file.c_str());
+	MonoAssembly *assembly = mono_domain_assembly_open (domain, file.c_str());
 	MonoImage* image = mono_assembly_get_image (assembly);
 
 	MonoClass* klass = mono_class_from_name (image, "EmbedSample", "Adder");
@@ -65,8 +74,8 @@ void init_mono()
 
 int main(int argc, char *argv[])
 {
-    init_mono ();
     QApplication app(argc, argv);
+    init_mono ();
 
     QWidget window;
     window.resize(200, 120);
