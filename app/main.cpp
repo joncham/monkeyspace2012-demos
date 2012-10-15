@@ -12,6 +12,8 @@
 #include <mono/jit/jit.h>
 #include <mono/metadata/assembly.h>
 
+#include <string>
+
 static MonoMethod* s_Add;
 
 class Adder : public QPushButton
@@ -61,7 +63,7 @@ void init_mono()
 #ifdef WIN32
 	path += "/../Add.dll";
 #else
-	std::string file("/Users/jonathan/Development/monkeyspace2012-demos/app/Add.dll");
+	path += "/../../../Add.dll";
 #endif
 	std::string file (path.toUtf8().constData());
 	MonoDomain* domain = mono_jit_init (file.c_str());
