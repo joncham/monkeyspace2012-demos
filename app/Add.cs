@@ -6,7 +6,7 @@ namespace EmbedSample
 	{
 		public static double Add(double a, double b)
 		{
-			return a + b + 1;
+			return a + b;
 		}
 	}
 }
