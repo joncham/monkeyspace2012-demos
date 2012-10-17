@@ -133,7 +133,7 @@ class ExecuteButton : public QPushButton
     	_lineEdit2(lineEdit2),
     	_lineEdit3(lineEdit3)
     {
-    	this->setText("Add");
+    	this->setText("Execute");
     }
 
   protected:
