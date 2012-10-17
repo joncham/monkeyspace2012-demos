@@ -1,7 +1,7 @@
 app.app/*
 Makefile
 *.o
-/Add.dll
+/*.dll
 /*.vcxproj*
 /*.sdf
 /*.opensdf

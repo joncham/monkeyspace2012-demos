@@ -4,10 +4,10 @@ namespace EmbedSample
 {
 	public class Operation : IOperation
 	{
-		public string Name { get { return "Add"; } }
+		public string Name { get { return "Divide"; } }
 		public double Execute(double a, double b)
 		{
-			return a + b;
+			return a / b;
 		}
 	}
 }
