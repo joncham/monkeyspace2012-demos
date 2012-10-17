@@ -14,14 +14,3 @@ LIBS += -L$${MONO_INSTALL}/lib -lmono-2.0
 
 # Input
 SOURCES += main.cpp
-CS_SOURCES += Core.cs Add.cs Subtract.cs Multiply.cs Divide.cs
-
-c_sharp.output = ${QMAKE_FILE_IN_BASE}.dll
-c_sharp.input = CS_SOURCES
-c_sharp.commands = gmcs ${QMAKE_FILE_IN} $${IDLFLAGS} \
-                 -t:library -r:Core.dll  -o:${QMAKE_FILE_IN_BASE}.dll
-c_sharp.name = GMCS
-c_sharp.variable_out = CS_OUTPUT
- 
-QMAKE_EXTRA_COMPILERS += c_sharp
-PRE_TARGETDEPS += Core.dll Add.dll Subtract.dll Multiply.dll Divide.dll
