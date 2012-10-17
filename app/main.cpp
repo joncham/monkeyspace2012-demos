@@ -31,7 +31,7 @@ public:
 		path += "/../../../";
 	#endif
 		std::string file (path.toUtf8().constData());
-		MonoDomain* domain = mono_jit_init (file.c_str());
+		mono_jit_init (file.c_str());
 		
 		QString core("Core.dll");
 		QDir dir(path);
@@ -122,10 +122,10 @@ private:
 	MonoEmbedHelper* _embedHelper;
 };
 
-class Adder : public QPushButton
+class ExecuteButton : public QPushButton
 {
   public:
-    Adder(MonoEmbedHelper* embedHelper, MyDropDown* dropDown, QLineEdit* lineEdit1, QLineEdit* lineEdit2, QLineEdit* lineEdit3, QWidget *parent = 0) : 
+    ExecuteButton(MonoEmbedHelper* embedHelper, MyDropDown* dropDown, QLineEdit* lineEdit1, QLineEdit* lineEdit2, QLineEdit* lineEdit3, QWidget *parent = 0) : 
     	QPushButton(parent), 
 		_embedHelper(embedHelper),
 		_dropDown(dropDown),
@@ -180,16 +180,16 @@ int main(int argc, char *argv[])
 	
 	MyDropDown dropDown(&embedHelper);
 
-    Adder add(&embedHelper, &dropDown, &lineEdit, &lineEdit2, &lineEdit3);
-    add.setFont(QFont("Times", 18, QFont::Bold));
-	add.setGeometry(10, 40, 180, 40);
+    ExecuteButton executeButton(&embedHelper, &dropDown, &lineEdit, &lineEdit2, &lineEdit3);
+    executeButton.setFont(QFont("Times", 18, QFont::Bold));
+	executeButton.setGeometry(10, 40, 180, 40);
 
 
     QVBoxLayout *layout = new QVBoxLayout;
     layout->addWidget(&lineEdit);
     layout->addWidget(&lineEdit2);
     layout->addWidget(&dropDown);
-    layout->addWidget(&add);
+    layout->addWidget(&executeButton);
     layout->addWidget(&lineEdit3);
     window.setLayout(layout);
 
