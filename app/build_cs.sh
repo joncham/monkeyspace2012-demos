@@ -1,3 +1,4 @@
+#!/bin/sh -x
 gmcs Core.cs -t:library
 gmcs Add.cs -r:Core.dll -t:library
 gmcs Subtract.cs -r:Core.dll -t:library

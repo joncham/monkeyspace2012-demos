@@ -77,7 +77,7 @@ private:
 		for (int i = 0; i < mono_array_length (operationsData); i++)
 		{
 			OperationData operationData = mono_array_get (operationsData, OperationData, i);
-			_operations.push_back(op_pair((QChar*)mono_string_chars(operationData.Name), operationData.Handle));
+			_operations.push_back(op_pair(QString((QChar*)mono_string_chars(operationData.Name)), operationData.Handle));
 		}
 	}
 
