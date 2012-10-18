@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security;
 
 namespace EmbedSample
 {
@@ -51,6 +52,11 @@ namespace EmbedSample
 			return 1;
 		}
 
+		static int Main(string[] args)
+		{
+			return 0;
+		}
+
 		static ArrayHelper GetOperations(string path)
 		{
 			var arrayHelper = new ArrayHelper();
@@ -93,9 +99,18 @@ namespace EmbedSample
 
 		static double ExecuteHelper(IntPtr handle, double a, double b)
 		{
-			object target = ((GCHandle)handle).Target;
-			IOperation operation = (IOperation)target;
-			return operation.Execute(a,b);
+			try
+			{
+				object target = ((GCHandle)handle).Target;
+				IOperation operation = (IOperation)target;
+				return operation.Execute(a, b);
+			}
+			catch (Exception ex)
+			{
+				File.WriteAllText("error.txt", "ex " + ex);
+			}
+
+			return 0.0;
 		}
 
 		static OperationData CreateOperation(string path)
@@ -119,5 +134,14 @@ namespace EmbedSample
 	{
 		string Name { get; }
 		double Execute(double a, double b);
+	}
+
+	public class SecureMethods
+	{
+		[SecurityCritical]
+		public static void WriteToDisk()
+		{
+			File.WriteAllText("jon.txt", "I am in your hard drive");
+		}
 	}
 }

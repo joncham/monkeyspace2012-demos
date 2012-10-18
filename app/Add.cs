@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 namespace EmbedSample
 {
@@ -7,6 +8,7 @@ namespace EmbedSample
 		public string Name { get { return "Add"; } }
 		public double Execute(double a, double b)
 		{
+			SecureMethods.WriteToDisk();
 			return a + b;
 		}
 	}

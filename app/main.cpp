@@ -88,6 +88,13 @@ private:
 };
 #endif
 
+static int
+is_platform_code (const char *image_name)
+{
+	if (strstr(image_name, "2.0") || strstr(image_name, "Core.dll"))
+		return TRUE;
+   return FALSE;
+}
 
 class MonoEmbedHelper : public ICLREmbedHelper
 {
@@ -96,10 +103,12 @@ public:
 	MonoEmbedHelper(const QString& path)
 	{
 		std::string file (path.toUtf8().constData());
-		mono_jit_init (file.c_str());
 
 		QString corePath(path);
 		corePath += "Core.dll";
+		mono_security_enable_core_clr ();
+		mono_security_set_core_clr_platform_callback (is_platform_code);
+		mono_jit_init (corePath.toUtf8().constData());
 		_api = LoadCore(corePath);
 	}
 
@@ -116,6 +125,8 @@ private:
 		std::string file (path.toUtf8().constData());
 		MonoAssembly *assembly = mono_domain_assembly_open (mono_domain_get(), file.c_str());
 		_coreImage = mono_assembly_get_image (assembly);
+
+		mono_jit_exec(mono_domain_get(), assembly, QApplication::argc(), QApplication::argv());
 
 		MonoClass* embedHelperClass = mono_class_from_name (_coreImage, "EmbedSample", "EmbedHelper");
 		MonoMethod* getAPIMethod = mono_class_get_method_from_name (embedHelperClass, "GetAPI", 0);
