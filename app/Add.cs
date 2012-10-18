@@ -6,6 +6,8 @@ namespace EmbedSample
 	{
 		public static double Add(double a, double b)
 		{
+			object o = null;
+			o.ToString();
 			return a + b;
 		}
 	}
