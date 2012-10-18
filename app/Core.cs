@@ -8,24 +8,83 @@ namespace EmbedSample
 {
 	public struct OperationData
 	{
-		public string Name;
+		public IntPtr Name;
 		public IntPtr GCHandle;
+	}
+
+	public struct ArrayHelper
+	{
+		public int Length;
+		public IntPtr Data;
+	}
+
+	public delegate ArrayHelper GetOperationsFunc([MarshalAs(UnmanagedType.LPWStr)]string p);
+	public delegate double ExecuteFunc(IntPtr handle, double a, double b);
+
+	public struct EmbedAPI
+	{
+		public GetOperationsFunc GetOperations;
+		public ExecuteFunc Execute;
 	}
 
 	public class EmbedHelper
 	{
-		static OperationData[] GetOperations(string path)
-		{
-			var operations = new List<OperationData>();
-			foreach (string file in Directory.GetFiles(path, "*.dll"))
-			{
-				if (file.EndsWith("Core.dll"))
-					continue;
+		static EmbedAPI _api;
 
-				operations.Add(CreateOperation(file));
+		static IntPtr GetAPI()
+		{
+			_api = new EmbedAPI() {
+				GetOperations = GetOperations,
+				Execute = ExecuteHelper
+			};
+
+			IntPtr ptr = Marshal.AllocHGlobal(Marshal.SizeOf(_api));
+			Marshal.StructureToPtr(_api, ptr, false);
+			return ptr;
+		}
+
+		static ArrayHelper GetOperations(string path)
+		{
+			var arrayHelper = new ArrayHelper();
+			try
+			{
+				List<string> files = new List<string>(Directory.GetFiles(path, "*.dll"));
+				List<OperationData> operations = new List<OperationData>();
+				foreach (string file in files)
+				{
+					if (file.EndsWith("Core.dll"))
+						continue;
+
+					operations.Add(CreateOperation(file));
+				}
+				arrayHelper.Data = MarshalOperations(operations);
+				
+			}
+			catch (Exception ex)
+			{
+				File.WriteAllText("error.txt", "ex " + ex);
+			}
+			return arrayHelper;
+		}
+
+		static IntPtr MarshalOperations(List<OperationData> operations)
+		{
+			int sizeOfOperationData = Marshal.SizeOf(typeof(OperationData));
+			IntPtr ptr = Marshal.AllocHGlobal(sizeOfOperationData * operations.Count);
+			foreach (var operation in operations)
+			{
+				Marshal.StructureToPtr(operation, ptr, false);
+				ptr = (IntPtr)(ptr.ToInt64() + sizeOfOperationData);
 			}
 
-			return operations.ToArray();
+			return ptr;
+		}
+
+		static double ExecuteHelper(IntPtr handle, double a, double b)
+		{
+			object target = ((GCHandle)handle).Target;
+			IOperation operation = (IOperation)target;
+			return operation.Execute(a,b);
 		}
 
 		static OperationData CreateOperation(string path)
@@ -37,7 +96,7 @@ namespace EmbedSample
 				{
 					IOperation o = (IOperation)Activator.CreateInstance(type);
 					IntPtr handle = (IntPtr)GCHandle.Alloc(o);
-					return new OperationData() { Name = o.Name, GCHandle = handle };
+					return new OperationData() { Name = Marshal.StringToHGlobalUni(o.Name), GCHandle = handle };
 				}
 			}
 

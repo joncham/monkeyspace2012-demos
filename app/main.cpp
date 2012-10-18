@@ -19,11 +19,36 @@
 typedef std::pair<QString, int> op_pair;
 typedef std::vector<op_pair> op_vector;
 
+#ifdef WIN32
+extern "C" void* __stdcall GlobalFree(void* ptr);
+#endif
+
 typedef struct
 {
-	MonoString* Name;
+	QChar* Name;
 	intptr_t Handle;
 } OperationData;
+
+typedef struct
+{
+	int Length;
+	void* Data;
+} ArrayData;
+
+#ifdef WIN32
+#define CALLING_CONV __stdcall
+#else
+#define CALLING_CONV
+#endif
+
+typedef ArrayData (CALLING_CONV *GetOperationsFunc)(const ushort * path);
+typedef double (CALLING_CONV *ExecuteFunc)(intptr_t handle, double a, double b);
+
+typedef struct 
+{
+	GetOperationsFunc GetOperations;
+	ExecuteFunc Execute;
+} EmbedAPI;
 
 class MonoEmbedHelper
 {
@@ -52,13 +77,7 @@ public:
 
 	double ExecuteOperation(int gchandle, double a, double b)
 	{
-		void* args[2];
-		args[0] = &a;
-		args[1] = &b;
-		MonoObject* object = mono_gchandle_get_target (gchandle);
-		MonoMethod* virtualExecute = mono_object_get_virtual_method (object, _executeMethod);
-		MonoObject* boxedResult = mono_runtime_invoke(virtualExecute, object, args, NULL);
-		double d = *(double*)mono_object_unbox (boxedResult);
+		double d = _embedAPI->Execute(gchandle, a, b);
 
 		return d;
 	}
@@ -67,18 +86,16 @@ private:
 
 	void ProcessAssemblies(const QString& path)
 	{
-		_embedHelperClass = mono_class_from_name (_coreImage, "EmbedSample", "EmbedHelper");
-		_getOperationsMethod = mono_class_get_method_from_name (_embedHelperClass, "GetOperations", 1);
+		ArrayData arrayData = _embedAPI->GetOperations(path.utf16());
 
-		void* args[1];
-		args[0] = mono_string_new (mono_domain_get (), path.toUtf8().constData());
-		MonoArray* operationsData = (MonoArray*)mono_runtime_invoke (_getOperationsMethod, NULL, args, NULL);
-
-		for (int i = 0; i < mono_array_length (operationsData); i++)
+		for (int i = 0; i < arrayData.Length; i++)
 		{
-			OperationData operationData = mono_array_get (operationsData, OperationData, i);
-			_operations.push_back(op_pair(QString((QChar*)mono_string_chars(operationData.Name)), operationData.Handle));
+			OperationData* operationData = (OperationData*)((char*)arrayData.Data + i*sizeof(OperationData));
+			_operations.push_back(op_pair(QString(operationData->Name), operationData->Handle));
+			MarshalFree(operationData->Name);
 		}
+		
+		MarshalFree(arrayData.Data);
 	}
 
 	void LoadCore(QString path)
@@ -87,16 +104,25 @@ private:
 		MonoAssembly *assembly = mono_domain_assembly_open (mono_domain_get(), file.c_str());
 		_coreImage = mono_assembly_get_image (assembly);
 
-		_operationItfClass = mono_class_from_name (_coreImage, "EmbedSample", "IOperation");
-		_executeMethod = mono_class_get_method_from_name (_operationItfClass, "Execute", 2);
+		MonoClass* embedHelperClass = mono_class_from_name (_coreImage, "EmbedSample", "EmbedHelper");
+		MonoMethod* getAPIMethod = mono_class_get_method_from_name (embedHelperClass, "GetAPI", 0);
+		MonoObject* boxedEmbedAPI = mono_runtime_invoke (getAPIMethod, NULL, NULL, NULL);
+		_embedAPI = *(EmbedAPI**)mono_object_unbox (boxedEmbedAPI);
+	}
+
+	void MarshalFree(void* ptr)
+	{
+#ifdef WIN32
+		GlobalFree(ptr);
+#else
+		// should use g_free
+		free(ptr);
+#endif
 	}
 
 	std::vector<op_pair> _operations;
 	MonoImage* _coreImage;
-	MonoClass* _operationItfClass;
-	MonoMethod* _executeMethod;
-	MonoClass* _embedHelperClass;
-	MonoMethod* _getOperationsMethod;
+	EmbedAPI* _embedAPI;
 };
 
 class MyDropDown : public QComboBox
