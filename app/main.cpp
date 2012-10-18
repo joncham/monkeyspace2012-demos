@@ -19,6 +19,12 @@
 typedef std::pair<QString, int> op_pair;
 typedef std::vector<op_pair> op_vector;
 
+typedef struct
+{
+	MonoString* Name;
+	intptr_t Handle;
+} OperationData;
+
 class MonoEmbedHelper
 {
 public:
@@ -32,18 +38,11 @@ public:
 	#endif
 		std::string file (path.toUtf8().constData());
 		mono_jit_init (file.c_str());
-		
-		QString core("Core.dll");
-		QDir dir(path);
-		QStringList filters;
-		filters.append("*.dll");
-		QStringList list = dir.entryList(filters);
-		list.removeAll(core);
 
 		QString corePath(path);
 		corePath += "Core.dll";
 		LoadCore(corePath);
-		ProcessAssemblies(path, list);
+		ProcessAssemblies(path);
 	}
 
 	const op_vector& GetOperations()
@@ -66,13 +65,19 @@ public:
 
 private:
 
-	void ProcessAssemblies(const QString& path, const QStringList& assemblies)
+	void ProcessAssemblies(const QString& path)
 	{
-		for (int i = 0; i < assemblies.count(); i++)
+		_embedHelperClass = mono_class_from_name (_coreImage, "EmbedSample", "EmbedHelper");
+		_getOperationsMethod = mono_class_get_method_from_name (_embedHelperClass, "GetOperations", 1);
+
+		void* args[1];
+		args[0] = mono_string_new (mono_domain_get (), path.toUtf8().constData());
+		MonoArray* operationsData = (MonoArray*)mono_runtime_invoke (_getOperationsMethod, NULL, args, NULL);
+
+		for (int i = 0; i < mono_array_length (operationsData); i++)
 		{
-			QString filename = path;
-			filename += assemblies.at(i);
-			LoadOperation(filename);
+			OperationData operationData = mono_array_get (operationsData, OperationData, i);
+			_operations.push_back(op_pair((QChar*)mono_string_chars(operationData.Name), operationData.Handle));
 		}
 	}
 
@@ -80,29 +85,18 @@ private:
 	{
 		std::string file (path.toUtf8().constData());
 		MonoAssembly *assembly = mono_domain_assembly_open (mono_domain_get(), file.c_str());
-		MonoImage* image = mono_assembly_get_image (assembly);
+		_coreImage = mono_assembly_get_image (assembly);
 
-		_operationItfClass = mono_class_from_name (image, "EmbedSample", "IOperation");
+		_operationItfClass = mono_class_from_name (_coreImage, "EmbedSample", "IOperation");
 		_executeMethod = mono_class_get_method_from_name (_operationItfClass, "Execute", 2);
-	}
-	
-	void LoadOperation(QString path)
-	{
-		std::string file (path.toUtf8().constData());
-		MonoAssembly *assembly = mono_domain_assembly_open (mono_domain_get(), file.c_str());
-		MonoImage* image = mono_assembly_get_image (assembly);
-
-		MonoClass* klass = mono_class_from_name (image, "EmbedSample", "Operation");
-		MonoObject* object = mono_object_new(mono_domain_get(), klass);
-		MonoProperty* prop = mono_class_get_property_from_name (klass, "Name");
-		MonoObject* propValue = mono_property_get_value (prop, object, NULL, NULL);
-		QString name((QChar*)mono_string_chars ((MonoString*)propValue));
-		_operations.push_back(op_pair(name, mono_gchandle_new (object, FALSE)));
 	}
 
 	std::vector<op_pair> _operations;
+	MonoImage* _coreImage;
 	MonoClass* _operationItfClass;
 	MonoMethod* _executeMethod;
+	MonoClass* _embedHelperClass;
+	MonoMethod* _getOperationsMethod;
 };
 
 class MyDropDown : public QComboBox
