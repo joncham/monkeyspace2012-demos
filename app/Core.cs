@@ -37,10 +37,18 @@ namespace EmbedSample
 				GetOperations = GetOperations,
 				Execute = ExecuteHelper
 			};
-
 			IntPtr ptr = Marshal.AllocHGlobal(Marshal.SizeOf(_api));
 			Marshal.StructureToPtr(_api, ptr, false);
 			return ptr;
+		}
+
+		public  static int DotNetEntryPoint(String pwzArgument)
+		{
+			long l = long.Parse(pwzArgument);
+			IntPtr ptr = (IntPtr)l;
+			Marshal.WriteIntPtr(ptr, GetAPI());
+
+			return 1;
 		}
 
 		static ArrayHelper GetOperations(string path)
@@ -57,6 +65,7 @@ namespace EmbedSample
 
 					operations.Add(CreateOperation(file));
 				}
+				arrayHelper.Length = operations.Count;
 				arrayHelper.Data = MarshalOperations(operations);
 				
 			}
@@ -70,14 +79,16 @@ namespace EmbedSample
 		static IntPtr MarshalOperations(List<OperationData> operations)
 		{
 			int sizeOfOperationData = Marshal.SizeOf(typeof(OperationData));
-			IntPtr ptr = Marshal.AllocHGlobal(sizeOfOperationData * operations.Count);
+			IntPtr ptr;
+			IntPtr ptr_orig = ptr = Marshal.AllocHGlobal(sizeOfOperationData * operations.Count);
+
 			foreach (var operation in operations)
 			{
 				Marshal.StructureToPtr(operation, ptr, false);
 				ptr = (IntPtr)(ptr.ToInt64() + sizeOfOperationData);
 			}
 
-			return ptr;
+			return ptr_orig;
 		}
 
 		static double ExecuteHelper(IntPtr handle, double a, double b)

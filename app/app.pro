@@ -12,5 +12,9 @@ INCLUDEPATH += $${MONO_INSTALL}/include/mono-2.0
 
 LIBS += -L$${MONO_INSTALL}/lib -lmono-2.0
 
+win32 {
+LIBS += -lMSCorEE
+}
+
 # Input
 SOURCES += main.cpp

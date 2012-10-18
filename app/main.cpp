@@ -20,7 +20,7 @@ typedef std::pair<QString, int> op_pair;
 typedef std::vector<op_pair> op_vector;
 
 #ifdef WIN32
-extern "C" void* __stdcall GlobalFree(void* ptr);
+#include "MSCorEE.h"
 #endif
 
 typedef struct
@@ -50,10 +50,61 @@ typedef struct
 	ExecuteFunc Execute;
 } EmbedAPI;
 
+class DotNetEmbedHelper
+{
+public:
+	static EmbedAPI* GetEmbedAPI(const QString& path)
+	{
+		ICLRRuntimeHost* pHost;
+		HRESULT hr = CorBindToRuntimeEx (NULL, NULL, 0, CLSID_CLRRuntimeHost, IID_ICLRRuntimeHost, (void**)&pHost);
+		DWORD ret = 0;
+		QString assPath = path + "Core.dll";
+		
+		EmbedAPI* api = (EmbedAPI*)malloc(sizeof(EmbedAPI));
+		memset(api, 0, sizeof(EmbedAPI));
+		QString arg = QString::number((qlonglong)&api);
+		hr = pHost->Start();
+		hr = pHost->ExecuteInDefaultAppDomain(assPath.utf16(), L"EmbedSample.EmbedHelper", L"DotNetEntryPoint", arg.utf16(), &ret);
+
+		return api;
+	}
+};
+
 class MonoEmbedHelper
 {
 public:
-	MonoEmbedHelper()
+	static EmbedAPI* GetEmbedAPI(const QString& path)
+	{
+		std::string file (path.toUtf8().constData());
+		mono_jit_init (file.c_str());
+
+		QString corePath(path);
+		corePath += "Core.dll";
+		return LoadCore(corePath);
+	}
+
+private:
+	static EmbedAPI* LoadCore(QString path)
+	{
+		std::string file (path.toUtf8().constData());
+		MonoAssembly *assembly = mono_domain_assembly_open (mono_domain_get(), file.c_str());
+		_coreImage = mono_assembly_get_image (assembly);
+
+		MonoClass* embedHelperClass = mono_class_from_name (_coreImage, "EmbedSample", "EmbedHelper");
+		MonoMethod* getAPIMethod = mono_class_get_method_from_name (embedHelperClass, "GetAPI", 0);
+		MonoObject* boxedEmbedAPI = mono_runtime_invoke (getAPIMethod, NULL, NULL, NULL);
+		return  *(EmbedAPI**)mono_object_unbox (boxedEmbedAPI);
+	}
+
+	static MonoImage* _coreImage;
+};
+
+MonoImage* MonoEmbedHelper::_coreImage = 0;
+
+class CLREmbedHelper
+{
+public:
+	CLREmbedHelper()
 	{
 		QString path = QFileInfo( QCoreApplication::applicationFilePath() ).absolutePath();
 	#ifdef WIN32
@@ -62,11 +113,11 @@ public:
 		path += "/../../../";
 	#endif
 		std::string file (path.toUtf8().constData());
-		mono_jit_init (file.c_str());
-
-		QString corePath(path);
-		corePath += "Core.dll";
-		LoadCore(corePath);
+#if 0
+		_embedAPI = MonoEmbedHelper::GetEmbedAPI(path);
+#else
+		_embedAPI = DotNetEmbedHelper::GetEmbedAPI(path);
+#endif
 		ProcessAssemblies(path);
 	}
 
@@ -98,18 +149,6 @@ private:
 		MarshalFree(arrayData.Data);
 	}
 
-	void LoadCore(QString path)
-	{
-		std::string file (path.toUtf8().constData());
-		MonoAssembly *assembly = mono_domain_assembly_open (mono_domain_get(), file.c_str());
-		_coreImage = mono_assembly_get_image (assembly);
-
-		MonoClass* embedHelperClass = mono_class_from_name (_coreImage, "EmbedSample", "EmbedHelper");
-		MonoMethod* getAPIMethod = mono_class_get_method_from_name (embedHelperClass, "GetAPI", 0);
-		MonoObject* boxedEmbedAPI = mono_runtime_invoke (getAPIMethod, NULL, NULL, NULL);
-		_embedAPI = *(EmbedAPI**)mono_object_unbox (boxedEmbedAPI);
-	}
-
 	void MarshalFree(void* ptr)
 	{
 #ifdef WIN32
@@ -121,14 +160,13 @@ private:
 	}
 
 	std::vector<op_pair> _operations;
-	MonoImage* _coreImage;
 	EmbedAPI* _embedAPI;
 };
 
 class MyDropDown : public QComboBox
 {
 public:
-	MyDropDown(MonoEmbedHelper* embedHelper) : 
+	MyDropDown(CLREmbedHelper* embedHelper) : 
 		_embedHelper(embedHelper)
 	{
 		for (int i = 0; i < _embedHelper->GetOperations().size(); i++)
@@ -139,13 +177,13 @@ public:
 	}
 
 private:
-	MonoEmbedHelper* _embedHelper;
+	CLREmbedHelper* _embedHelper;
 };
 
 class ExecuteButton : public QPushButton
 {
   public:
-    ExecuteButton(MonoEmbedHelper* embedHelper, MyDropDown* dropDown, QLineEdit* lineEdit1, QLineEdit* lineEdit2, QLineEdit* lineEdit3, QWidget *parent = 0) : 
+    ExecuteButton(CLREmbedHelper* embedHelper, MyDropDown* dropDown, QLineEdit* lineEdit1, QLineEdit* lineEdit2, QLineEdit* lineEdit3, QWidget *parent = 0) : 
     	QPushButton(parent), 
 		_embedHelper(embedHelper),
 		_dropDown(dropDown),
@@ -178,7 +216,7 @@ class ExecuteButton : public QPushButton
 	} 
 
 private:
-	MonoEmbedHelper* _embedHelper;
+	CLREmbedHelper* _embedHelper;
 	MyDropDown* _dropDown;
 	QLineEdit* _lineEdit1;
 	QLineEdit* _lineEdit2;
@@ -188,7 +226,7 @@ private:
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-	MonoEmbedHelper embedHelper;
+	CLREmbedHelper embedHelper;
 
     QWidget window;
     window.resize(200, 120);
