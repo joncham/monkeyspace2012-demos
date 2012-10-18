@@ -10,6 +10,8 @@
 #include <QFileInfo>
 #include <QDir>
 
+#include <QElapsedTimer>
+
 #include <mono/jit/jit.h>
 #include <mono/metadata/assembly.h>
 
@@ -74,12 +76,41 @@ public:
 	{
 		return _operations;
 	}
-
+	
+	typedef double (CALLING_CONV *ExecuteHelper) (int gchandle, double a, double b, MonoException** exc);
+#define USE_INVOKE 0
+#define USE_THUNK 1
 	double ExecuteOperation(int gchandle, double a, double b)
 	{
-		double d = _embedAPI->Execute(gchandle, a, b);
+#if USE_INVOKE || USE_THUNK
+		MonoClass* embedHelperClass = mono_class_from_name (_coreImage, "EmbedSample", "EmbedHelper");
+		MonoMethod* executeHelperMethod = mono_class_get_method_from_name (embedHelperClass, "ExecuteHelper", 3);
+#endif
+#if USE_THUNK
+		MonoException* exc;
+		ExecuteHelper executeHelper = (ExecuteHelper)mono_method_get_unmanaged_thunk (executeHelperMethod);
+#endif
+		QElapsedTimer timer;
+		timer.start();
+		double d = 0;
+		for (int i = 0; i < 1000000; i++)
+		{
+			a = i;
+			b = i + 1;
+#if USE_INVOKE
+			void* args[3];
+			args[0] = &gchandle;
+			args[1] = &a;
+			args[2] = &b;
+			MonoObject* boxedEmbedAPI = mono_runtime_invoke (executeHelperMethod, NULL, args, NULL);
+#elif USE_THUNK
+			d = executeHelper(gchandle, a, b, &exc);
+#else
+			d = _embedAPI->Execute(gchandle, a, b);
+#endif
+		}
 
-		return d;
+		return ((double)timer.nsecsElapsed())/1000000;
 	}
 
 private:
