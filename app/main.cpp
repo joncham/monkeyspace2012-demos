@@ -58,6 +58,7 @@ public:
 
 };
 
+#ifdef WIN32
 class DotNetEmbedHelper : public ICLREmbedHelper
 {
 public:
@@ -85,6 +86,8 @@ public:
 private:
 	EmbedAPI* _api;
 };
+#endif
+
 
 class MonoEmbedHelper : public ICLREmbedHelper
 {
@@ -137,6 +140,7 @@ public:
 	#endif
 		std::string file (path.toUtf8().constData());
 
+#ifdef WIN32
 		bool useDotNot = false;
 		for (int i = 0; i < QApplication::argc(); i++)
 		{
@@ -147,6 +151,7 @@ public:
 		if (useDotNot)
 			_embedHelper = new DotNetEmbedHelper(path);
 		else
+#endif
 			_embedHelper = new MonoEmbedHelper(path);
 
 		ProcessAssemblies(path);
