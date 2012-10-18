@@ -50,41 +50,65 @@ typedef struct
 	ExecuteFunc Execute;
 } EmbedAPI;
 
-class DotNetEmbedHelper
+class ICLREmbedHelper
 {
 public:
-	static EmbedAPI* GetEmbedAPI(const QString& path)
+	virtual QString GetName() = 0;
+	virtual EmbedAPI* GetEmbedAPI() = 0;
+
+};
+
+class DotNetEmbedHelper : public ICLREmbedHelper
+{
+public:
+	DotNetEmbedHelper(const QString& path)
 	{
 		ICLRRuntimeHost* pHost;
 		HRESULT hr = CorBindToRuntimeEx (NULL, NULL, 0, CLSID_CLRRuntimeHost, IID_ICLRRuntimeHost, (void**)&pHost);
 		DWORD ret = 0;
 		QString assPath = path + "Core.dll";
 		
-		EmbedAPI* api = (EmbedAPI*)malloc(sizeof(EmbedAPI));
-		memset(api, 0, sizeof(EmbedAPI));
-		QString arg = QString::number((qlonglong)&api);
+		_api = (EmbedAPI*)malloc(sizeof(EmbedAPI));
+		memset(_api, 0, sizeof(EmbedAPI));
+		QString arg = QString::number((qlonglong)&_api);
 		hr = pHost->Start();
 		hr = pHost->ExecuteInDefaultAppDomain(assPath.utf16(), L"EmbedSample.EmbedHelper", L"DotNetEntryPoint", arg.utf16(), &ret);
-
-		return api;
 	}
+
+	virtual EmbedAPI* GetEmbedAPI()
+	{
+		return _api;
+	}
+
+	virtual QString GetName() { return "DotNet"; } 
+
+private:
+	EmbedAPI* _api;
 };
 
-class MonoEmbedHelper
+class MonoEmbedHelper : public ICLREmbedHelper
 {
 public:
-	static EmbedAPI* GetEmbedAPI(const QString& path)
+	
+	MonoEmbedHelper(const QString& path)
 	{
 		std::string file (path.toUtf8().constData());
 		mono_jit_init (file.c_str());
 
 		QString corePath(path);
 		corePath += "Core.dll";
-		return LoadCore(corePath);
+		_api = LoadCore(corePath);
 	}
 
+	virtual EmbedAPI* GetEmbedAPI()
+	{
+		return _api;
+	}
+
+	virtual QString GetName() { return "Mono"; }
+
 private:
-	static EmbedAPI* LoadCore(QString path)
+	EmbedAPI* LoadCore(QString path)
 	{
 		std::string file (path.toUtf8().constData());
 		MonoAssembly *assembly = mono_domain_assembly_open (mono_domain_get(), file.c_str());
@@ -96,10 +120,9 @@ private:
 		return  *(EmbedAPI**)mono_object_unbox (boxedEmbedAPI);
 	}
 
-	static MonoImage* _coreImage;
+	MonoImage* _coreImage;
+	EmbedAPI* _api;
 };
-
-MonoImage* MonoEmbedHelper::_coreImage = 0;
 
 class CLREmbedHelper
 {
@@ -113,11 +136,19 @@ public:
 		path += "/../../../";
 	#endif
 		std::string file (path.toUtf8().constData());
-#if 0
-		_embedAPI = MonoEmbedHelper::GetEmbedAPI(path);
-#else
-		_embedAPI = DotNetEmbedHelper::GetEmbedAPI(path);
-#endif
+
+		bool useDotNot = false;
+		for (int i = 0; i < QApplication::argc(); i++)
+		{
+			if (!strcmp(QApplication::argv()[i], "-dotnet"))
+				useDotNot = true;
+		}
+		
+		if (useDotNot)
+			_embedHelper = new DotNetEmbedHelper(path);
+		else
+			_embedHelper = new MonoEmbedHelper(path);
+
 		ProcessAssemblies(path);
 	}
 
@@ -128,16 +159,21 @@ public:
 
 	double ExecuteOperation(int gchandle, double a, double b)
 	{
-		double d = _embedAPI->Execute(gchandle, a, b);
+		double d = _embedHelper->GetEmbedAPI()->Execute(gchandle, a, b);
 
 		return d;
+	}
+
+	QString GetRuntimeName()
+	{
+		return _embedHelper->GetName();
 	}
 
 private:
 
 	void ProcessAssemblies(const QString& path)
 	{
-		ArrayData arrayData = _embedAPI->GetOperations(path.utf16());
+		ArrayData arrayData = _embedHelper->GetEmbedAPI()->GetOperations(path.utf16());
 
 		for (int i = 0; i < arrayData.Length; i++)
 		{
@@ -160,7 +196,7 @@ private:
 	}
 
 	std::vector<op_pair> _operations;
-	EmbedAPI* _embedAPI;
+	ICLREmbedHelper* _embedHelper;
 };
 
 class MyDropDown : public QComboBox
@@ -230,6 +266,7 @@ int main(int argc, char *argv[])
 
     QWidget window;
     window.resize(200, 120);
+	window.setWindowTitle(embedHelper.GetRuntimeName());
 
     QLineEdit lineEdit;
     QLineEdit lineEdit2;
