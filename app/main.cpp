@@ -78,8 +78,8 @@ public:
 	}
 	
 	typedef double (CALLING_CONV *ExecuteHelper) (int gchandle, double a, double b, MonoException** exc);
-#define USE_INVOKE 0
-#define USE_THUNK 1
+#define USE_INVOKE 1
+#define USE_THUNK 0
 	double ExecuteOperation(int gchandle, double a, double b)
 	{
 #if USE_INVOKE || USE_THUNK
