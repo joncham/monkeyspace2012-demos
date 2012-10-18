@@ -57,6 +57,7 @@ namespace EmbedSample
 
 					operations.Add(CreateOperation(file));
 				}
+				arrayHelper.Length = operations.Count;
 				arrayHelper.Data = MarshalOperations(operations);
 				
 			}
@@ -70,14 +71,15 @@ namespace EmbedSample
 		static IntPtr MarshalOperations(List<OperationData> operations)
 		{
 			int sizeOfOperationData = Marshal.SizeOf(typeof(OperationData));
-			IntPtr ptr = Marshal.AllocHGlobal(sizeOfOperationData * operations.Count);
+			IntPtr ptr_orig;
+			IntPtr ptr = ptr_orig = Marshal.AllocHGlobal(sizeOfOperationData * operations.Count);
 			foreach (var operation in operations)
 			{
 				Marshal.StructureToPtr(operation, ptr, false);
 				ptr = (IntPtr)(ptr.ToInt64() + sizeOfOperationData);
 			}
 
-			return ptr;
+			return ptr_orig;
 		}
 
 		static double ExecuteHelper(IntPtr handle, double a, double b)
